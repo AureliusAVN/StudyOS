@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StudyOS v5.5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="assets/icons/favicon.png">
+<style>
+  /* ── Auth tabs ── */
+  .auth-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 24px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(59,158,255,.22);
+  }
+  .auth-tab {
+    flex: 1;
+    padding: 10px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .auth-tab.active {
+    background: rgba(59,158,255,.18);
+    color: var(--accent);
+  }
+  .auth-panel { display: none; }
+  .auth-panel.active { display: block; }
+
+  /* appScreen は body の flex 子要素として横並びにする */
+  #appScreen {
+    display: none;   /* 初期非表示。ログイン後 flex に切り替える */
+    flex: 1;
+    flex-direction: row; /* sidebar + main を横並び */
+    height: 100vh;
+    overflow: hidden;
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Auth Screen ── -->
+<div id="authScreen" class="auth-screen" style="display:none">
+  <div class="auth-card">
+    <div class="auth-logo">StudyOS</div>
+    <div class="auth-sub">LEARN. TRACK. EVOLVE.</div>
+
+    <!-- タブ切り替え -->
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuthTab('login')">ログイン</button>
+      <button class="auth-tab"        onclick="switchAuthTab('register')">新規登録</button>
+    </div>
+
+    <!-- ログインパネル -->
+    <div id="authPanelLogin" class="auth-panel active">
+      <input id="loginEmail"    type="email"    placeholder="Email">
+      <input id="loginPassword" type="password" placeholder="Password">
+      <div class="auth-row">
+        <button class="primary-btn" onclick="loginUser()" style="flex:1">ログイン</button>
+      </div>
+      <div style="text-align:center;margin-top:10px">
+        <button onclick="resetPassword()" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline;padding:0">パスワードを忘れた場合</button>
+      </div>
+    </div>
+
+    <!-- 新規登録パネル -->
+    <div id="authPanelRegister" class="auth-panel">
+      <input id="registerEmail"    type="email"    placeholder="Email">
+      <input id="registerPassword" type="password" placeholder="Password（6文字以上）">
+      <input id="registerPassword2" type="password" placeholder="Password（確認）">
+      <div class="auth-row">
+        <button class="primary-btn" onclick="registerUser()" style="flex:1">アカウント作成</button>
+      </div>
+    </div>
+
+    <div id="authMsg" class="auth-msg"></div>
+  </div>
+</div>
+
+<!-- ── App Screen ── -->
+<div id="appScreen">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="logo"><span class="logo-dot"></span>StudyOS</div>
+
+    <button class="nav-btn active" onclick="showPage('dashboard',this)">
+      <span class="icon">⬡</span>Dashboard
+    </button>
+    <button class="nav-btn" onclick="showPage('tasks',this)">
+      <span class="icon">✓</span>Tasks
+    </button>
+    <button class="nav-btn" onclick="showPage('log',this)">
+      <span class="icon">◷</span>Study Log
+    </button>
+    <button class="nav-btn" onclick="showPage('review',this)">
+      <span class="icon">◈</span>Review
+    </button>
+
+    <div class="sidebar-divider"></div>
+
+    <button class="nav-btn" onclick="showPage('settings',this)">
+      <span class="icon">⚙</span>Settings
+    </button>
+
+    <div class="ai-status">
+      <div class="ai-status-dot" id="aiStatusDot"></div>
+      <div class="ai-status-text" id="aiStatusText">確認中...</div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+
+    <div class="header">
+      <div class="header-title">
+        StudyOS <span style="font-size:11px;color:var(--muted);font-weight:400">v5.5</span>
+      </div>
+      <div class="header-right">
+        <div id="clock">--:--</div>
+        <div class="profile">L</div>
+      </div>
+    </div>
+
+    <!-- ── Dashboard ── -->
+    <div id="dashboard" class="page active">
+      <div class="page-title">Dashboard</div>
+
+      <div class="ai-card" id="aiNextCard">
+        <h3>⚡ AI Recommended Next</h3>
+        <div class="ai-loading" id="aiNextLoading" style="display:none">分析中...</div>
+        <div id="aiNextResult"></div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h3>Today's Tasks</h3>
+          <div id="dashboardTasks"></div>
+        </div>
+        <div class="card">
+          <h3>Daily Goal</h3>
+          <div class="goal-numbers">
+            <div class="goal-current" id="goalCurrent">0</div>
+            <div class="goal-sep">/</div>
+            <div class="goal-target" id="goalTarget">—</div>
+            <div class="goal-unit">分</div>
+          </div>
+          <div class="progress-bar"><div id="goalFill" class="progress-fill"></div></div>
+          <div id="goalRemain" class="goal-remain"></div>
+          <div class="goal-set-row">
+            <input id="goalInput" type="number" min="1" placeholder="目標分数">
+            <button class="icon-btn" onclick="setDailyGoal()">設定</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Task Progress</h3>
+          <div id="progressText" style="font-family:'Syne',sans-serif;font-size:30px;font-weight:800">0%</div>
+          <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+          <div class="small" id="progressDetail" style="margin-top:9px"></div>
+        </div>
+        <div class="card">
+          <h3>Streak 🔥</h3>
+          <div class="streak-count" id="streakCount">0</div>
+          <div class="small" id="streakMsg" style="margin-top:6px"></div>
+          <div class="section-divider" style="height:1px;background:var(--border);margin:12px 0 9px"></div>
+          <div class="quick-stat">
+            <span class="quick-stat-label">今日</span>
+            <span class="quick-stat-val" id="todayTime">0m</span>
+          </div>
+          <div class="quick-stat" style="margin-bottom:0">
+            <span class="quick-stat-label">今週</span>
+            <span class="quick-stat-val" id="weekTime">0m</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="card"><h3>⚠ Overdue</h3><div id="overdueList"></div></div>
+        <div class="card"><h3>📅 Due Today</h3><div id="dueTodayList"></div></div>
+        <div class="card"><h3>🗓 Upcoming</h3><div id="upcomingList"></div></div>
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <div class="card"><h3>Last 7 Days</h3><div class="chart-wrap" id="chart"></div></div>
+        <div class="card"><h3>Subject Breakdown</h3><div id="subjectBreakdown"></div></div>
+      </div>
+
+      <div class="card">
+        <h3>Quick Add Task</h3>
+        <div class="input-row" style="margin-bottom:0">
+          <input id="quickTask" placeholder="タスクを入力して Enter か ＋" style="flex:1">
+          <select id="quickPriority" style="width:100px">
+            <option value="med">Medium</option>
+            <option value="high">High</option>
+            <option value="low">Low</option>
+          </select>
+          <input id="quickDue" type="date" style="width:140px">
+          <button class="primary-btn" onclick="quickAddTask()" style="flex-shrink:0">＋</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tasks ── -->
+    <div id="tasks" class="page">
+      <div class="page-title">Tasks</div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="input-row" style="margin-bottom:8px">
+          <input id="taskInput" placeholder="新しいタスク..." style="flex:1">
+          <select id="taskPriority" style="width:110px">
+            <option value="med">Medium</option>
+            <option value="high">High</option>
+            <option value="low">Low</option>
+          </select>
+          <input id="taskDue" type="date" style="width:150px">
+          <button class="primary-btn" onclick="addTask()" style="flex-shrink:0">＋ Add</button>
+        </div>
+        <input id="taskMemoInput" placeholder="メモ（任意）" style="margin-bottom:0;font-size:13px">
+      </div>
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input id="taskSearch" placeholder="タスク・メモを検索..."
+               oninput="window.renderTasks && window.renderTasks()">
+      </div>
+      <div class="filter-row">
+        <button class="filter-btn active" onclick="setTaskFilter('all',this)">すべて</button>
+        <button class="filter-btn" onclick="setTaskFilter('active',this)">未完了</button>
+        <button class="filter-btn" onclick="setTaskFilter('done',this)">完了済み</button>
+        <button class="filter-btn" onclick="setTaskFilter('overdue',this)">期限切れ</button>
+        <button class="filter-btn" onclick="setTaskFilter('high',this)">HIGH</button>
+      </div>
+      <div id="taskList"></div>
+    </div>
+
+    <!-- ── Study Log ── -->
+    <div id="log" class="page">
+      <div class="page-title">Study Log</div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="autocomplete-wrap">
+          <input id="subjectInput" placeholder="科目" autocomplete="off"
+                 oninput="onSubjectInput()" onblur="closeAutocomplete()">
+          <div class="autocomplete-list" id="autocompleteList"></div>
+        </div>
+        <div class="input-row" style="margin-bottom:8px">
+          <input id="timeInput" type="number" placeholder="分数" min="1" style="flex:1">
+        </div>
+        <textarea id="noteInput" placeholder="学習メモ（任意）"></textarea>
+        <button class="primary-btn" onclick="addLog()">◷ Save Log</button>
+      </div>
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input id="logSearch" placeholder="科目・メモを検索..."
+               oninput="window.renderLogs && window.renderLogs()">
+      </div>
+      <div id="logList"></div>
+    </div>
+
+    <!-- ── Review ── -->
+    <div id="review" class="page">
+      <div class="page-title">Review</div>
+      <div class="ai-card">
+        <h3>🤖 AI Review Analysis</h3>
+        <div style="display:flex;gap:9px;margin-bottom:12px;flex-wrap:wrap">
+          <button class="primary-btn"   onclick="runAIReview()">ログを分析する</button>
+          <button class="secondary-btn" onclick="runAIWeakDetect()">弱点科目を検出</button>
+        </div>
+        <div id="aiReviewResult"></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <div><label class="review-label">✦ Win</label><textarea id="winInput" placeholder="今日うまくいったこと"></textarea></div>
+        <div><label class="review-label">✦ Problem</label><textarea id="problemInput" placeholder="問題・課題"></textarea></div>
+        <div><label class="review-label">✦ Fix</label><textarea id="fixInput" placeholder="改善策"></textarea></div>
+        <div><label class="review-label">✦ Tomorrow</label><textarea id="tomorrowInput" placeholder="明日やること"></textarea></div>
+      </div>
+      <button class="primary-btn" onclick="saveReview()">◈ Save Review</button>
+      <div style="height:1px;background:var(--border);margin:18px 0"></div>
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input id="reviewSearch" placeholder="レビューを検索..."
+               oninput="window.renderReviews && window.renderReviews()">
+      </div>
+      <div id="reviewList"></div>
+    </div>
+
+    <!-- ── Settings ── -->
+    <div id="settings" class="page">
+      <div class="page-title">Settings</div>
+
+      <div class="card" style="margin-bottom:16px">
+        <h3>🤖 Groq AI 設定</h3>
+        <div style="color:var(--muted);font-size:13px;margin-bottom:14px;line-height:1.6">
+          Groq Cloud APIの設定を入力してください。<br>
+          APIキーは <a href="https://console.groq.com" target="_blank" style="color:var(--accent2)">console.groq.com</a> で無料取得できます。
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:5px">Groq API キー</label>
+          <div class="ollama-row">
+            <input id="ollamaUrl" type="password" placeholder="gsk_xxxxxxxxxxxxxxxxxxxx" style="margin-bottom:0">
+            <button class="icon-btn" onclick="saveOllamaSettings()">保存</button>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:5px">モデル名</label>
+          <div class="ollama-row">
+            <input id="ollamaModel" placeholder="llama-3.3-70b-versatile" style="margin-bottom:0">
+            <span class="model-badge" id="modelBadge">llama-3.3-70b-versatile</span>
+          </div>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:var(--muted);line-height:1.7">
+          おすすめ：<code style="color:var(--accent)">llama-3.3-70b-versatile</code> /
+          <code style="color:var(--accent)">llama-3.1-8b-instant</code> /
+          <code style="color:var(--accent)">gemma2-9b-it</code>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <h3>Account</h3>
+        <div id="accountEmail" class="small" style="margin-top:0;margin-bottom:12px"></div>
+        <button class="secondary-btn" onclick="logoutUser()">ログアウト</button>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <h3>Backup / Restore</h3>
+        <div style="color:var(--muted);font-size:13px;margin-bottom:14px;line-height:1.6">定期的にバックアップしてください。</div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap">
+          <button class="primary-btn"   onclick="exportData()">⬇ Export JSON</button>
+          <button class="secondary-btn" onclick="document.getElementById('importFile').click()">⬆ Import JSON</button>
+          <input id="importFile" type="file" accept=".json"
+                 style="display:none;margin-bottom:0" onchange="importData(event)">
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Danger Zone</h3>
+        <div style="color:var(--muted);font-size:13px;margin-bottom:14px;line-height:1.6">全データを削除します。この操作は取り消せません。</div>
+        <button class="delete-btn" style="padding:8px 16px" onclick="clearAllData()">すべて削除</button>
+      </div>
+    </div>
+
+  </div><!-- /.main -->
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-title" id="modalTitle">確認</div>
+      <div class="modal-msg"   id="modalMsg"></div>
+      <div class="modal-actions">
+        <button class="modal-cancel"  onclick="closeModal()">キャンセル</button>
+        <button class="modal-confirm" id="modalConfirm">削除</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+</div><!-- /#appScreen -->
+
+<script type="module" src="js/auth.js"></script>
+<script type="module" src="js/app.js"></script>
+
+</body>
+</html>
